@@ -1,1 +1,67 @@
-class EmergencyFinderTestSuite{constructor(){this.testData={patients:[],waitTimes:[],hospitals:[]}}async testRegistrationForm(){console.log("\nTesting Registration Form...");const testCases=[{name:"Valid Registration",data:{firstName:"John",lastName:"Doe",dob:"1990-01-01",symptoms:"Fever",location:"Central Hospital",severity:8},shouldPass:true}];for(const test of testCases){try{const result=await this.registerPatient(test.data);console.log(`${test.name}: ${result?"✅":"❌"}`)}catch(error){console.error(`${test.name} failed:`,error)}}}async testWaitTimeCalculations(){console.log("\nTesting Wait Time Calculations...");const testCases=[{name:"Normal Load",data:{currentPatients:10,severity:5,staffCount:4,averageTimePerPatient:20},expectedRange:{min:40,max:50}}];for(const test of testCases){try{const waitTime=await this.calculateWaitTime(test.data);const passed=waitTime>=test.expectedRange.min&&waitTime<=test.expectedRange.max;console.log(`${test.name}: ${passed?"✅":"❌"} (${waitTime} minutes)`)}catch(error){console.error(`${test.name} failed:`,error)}}}async testSeverityScale(){console.log("\nTesting Severity Scale...");const testCases=[{name:"Critical Symptoms",symptoms:["chest pain","shortness of breath"],expectedRange:{min:15,max:20}}];for(const test of testCases){try{const severity=await this.calculateSeverity(test.symptoms);const passed=severity>=test.expectedRange.min&&severity<=test.expectedRange.max;console.log(`${test.name}: ${passed?"✅":"❌"} (${severity}/20)`)}catch(error){console.error(`${test.name} failed:`,error)}}}async testMapFunctionality(){console.log("\nTesting Map Integration...");const testCases=[{name:"Distance Calculation",data:{userLocation:{lat:40.7128,lng:-74.0060},hospitalLocation:{lat:40.7589,lng:-73.9851}},expectedDistance:3.5}];for(const test of testCases){try{const distance=this.calculateDistance(test.data.userLocation,test.data.hospitalLocation);const passed=Math.abs(distance-test.expectedDistance)<=test.expectedDistance*0.1;console.log(`${test.name}: ${passed?"✅":"❌"} (${distance.toFixed(1)} miles)`)}catch(error){console.error(`${test.name} failed:`,error)}}}async registerPatient(data){if(!data.firstName||!data.lastName||!data.dob){throw new Error("Missing required fields")}this.testData.patients.push({...data,id:Date.now(),registrationTime:new Date().toISOString()});return true}async calculateWaitTime(data){const{currentPatients,severity,staffCount,averageTimePerPatient=20}=data;const patientsPerStaff=currentPatients/staffCount;const baseWaitTime=patientsPerStaff*averageTimePerPatient;const severityFactor=(21-severity)/20;let finalWaitTime=Math.round(baseWaitTime*severityFactor);if(severity>15){finalWaitTime=Math.min(finalWaitTime,10)}return Math.max(0,finalWaitTime)}async calculateSeverity(symptoms){const severityPoints={"chest pain":15,"shortness of breath":14,"fever":6,"cough":5};const totalSeverity=symptoms.reduce((sum,symptom)=>sum+(severityPoints[symptom]||1),0);return Math.min(20,Math.max(1,Math.round(totalSeverity/symptoms.length)))}calculateDistance(point1,point2){const R=3959;const lat1=this.toRadians(point1.lat);const lat2=this.toRadians(point2.lat);const dLat=this.toRadians(point2.lat-point1.lat);const dLon=this.toRadians(point2.lng-point1.lng);const a=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLon/2)*Math.sin(dLon/2);const c=2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));return R*c}toRadians(degrees){return degrees*(Math.PI/180)}}module.exports={EmergencyFinderTestSuite};
+import { Loader } from '@googlemaps/js-api-loader';
+import axios from 'axios';
+import '../css/styles.css';
+
+// Initialize Google Maps
+const loader = new Loader({
+    apiKey: process.env.GOOGLE_MAPS_API_KEY,
+    version: "weekly"
+});
+
+// Initialize map
+let map;
+loader.load().then(() => {
+    map = new google.maps.Map(document.getElementById("map"), {
+        center: { lat: -34.397, lng: 150.644 },
+        zoom: 8,
+    });
+});
+
+// Get weather data
+async function getWeather(lat, lon) {
+    try {
+        const response = await axios.get(`https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${process.env.WEATHER_API_KEY}&units=metric`);
+        return response.data;
+    } catch (error) {
+        console.error('Error fetching weather:', error);
+        return null;
+    }
+}
+
+// Initialize the application
+document.addEventListener('DOMContentLoaded', () => {
+    // Get user's location
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            async (position) => {
+                const { latitude, longitude } = position.coords;
+                
+                // Center map on user's location
+                map.setCenter({ lat: latitude, lng: longitude });
+                
+                // Get and display weather
+                const weather = await getWeather(latitude, longitude);
+                if (weather) {
+                    document.getElementById('weather').textContent = 
+                        `Current weather: ${weather.main.temp}°C, ${weather.weather[0].description}`;
+                }
+            },
+            (error) => {
+                console.error('Error getting location:', error);
+            }
+        );
+    }
+    
+    // Initialize form handlers
+    const form = document.getElementById('registration-form');
+    if (form) {
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            // Handle form submission
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData.entries());
+            console.log('Form submitted:', data);
+            // TODO: Send data to backend
+        });
+    }
+});
