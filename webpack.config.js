@@ -1,7 +1,36 @@
 const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const webpack = require('webpack');
-require('dotenv').config();
+const dotenv = require('dotenv');
+const fs = require('fs');
+
+// Get the root path
+const ROOT_PATH = path.resolve(__dirname);
+
+// Load environment variables
+const getEnvConfig = () => {
+  // Check if .env exists
+  const envPath = path.resolve(ROOT_PATH, '.env');
+  const envExample = path.resolve(ROOT_PATH, '.env.example');
+
+  let finalPath = fs.existsSync(envPath) ? envPath : envExample;
+  
+  const env = dotenv.config({ path: finalPath }).parsed;
+  
+  // Validate required environment variables
+  const requiredEnvVars = ['GOOGLE_MAPS_API_KEY', 'WEATHER_API_KEY'];
+  const missingEnvVars = requiredEnvVars.filter(key => !env || !env[key]);
+  
+  if (missingEnvVars.length > 0) {
+    throw new Error(`Missing required environment variables: ${missingEnvVars.join(', ')}`);
+  }
+
+  // Convert env variables to webpack-compatible format
+  return Object.keys(env).reduce((prev, next) => {
+    prev[`process.env.${next}`] = JSON.stringify(env[next]);
+    return prev;
+  }, {});
+};
 
 module.exports = {
   entry: './src/js/main.js',
@@ -37,10 +66,7 @@ module.exports = {
       hash: true,
       cache: false
     }),
-    new webpack.DefinePlugin({
-      'process.env.GOOGLE_MAPS_API_KEY': JSON.stringify(process.env.GOOGLE_MAPS_API_KEY),
-      'process.env.WEATHER_API_KEY': JSON.stringify(process.env.WEATHER_API_KEY)
-    })
+    new webpack.DefinePlugin(getEnvConfig())
   ],
   devServer: {
     static: {
